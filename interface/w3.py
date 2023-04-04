@@ -8,14 +8,12 @@ import requests
 from dotenv import load_dotenv
 from web3 import Web3
 
-from interface.abi.erc20 import ERC20
-
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
 class Provider:
-    """Class to interact with contracts or EOAs on chain."""
+    """Class to interact with blockchain."""
 
     def __init__(self, chain: str, fork: bool = True, proxy: bool = False):
         """Instantiate blockchain provider.
