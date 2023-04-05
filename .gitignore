@@ -41,7 +41,4 @@ share/python-wheels/
 *.egg
 MANIFEST
 
-# jupyter notebook stuff
-ls
-*.ipynb
 
