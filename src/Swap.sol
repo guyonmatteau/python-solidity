@@ -67,6 +67,11 @@ contract Swap is Ownable {
         amountOut = router.exactInputSingle(params);
     }
 
+    // @dev transfer method required to deposit into WETH contract
+    function transferETH(address to, uint256 amount) external onlyOwner {
+       payable(to).transfer(amount);
+    }
+
     function withdrawETH() external onlyOwner {
         payable(msg.sender).transfer(address(this).balance);
     }

@@ -3,7 +3,7 @@
 
 # ignore all env files
 .env*
-!.env.chain
+!.env.example
 
 
 # forge
