@@ -70,7 +70,7 @@ contract Swap is Ownable {
     // @dev transfer method required to deposit into WETH contract
     function transferETH(address to, uint256 amount) external onlyOwner {
         // TODO add reentrancy safeguard
-        (bool success, ) = to.call{value: amount}("");
+        (bool success,) = to.call{value: amount}("");
         require(success, "Transfer failed.");
     }
 

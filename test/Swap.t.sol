@@ -6,7 +6,6 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Swap} from "src/Swap.sol";
 
-
 contract SwapTest is Test {
     Swap internal swap;
 
@@ -17,33 +16,29 @@ contract SwapTest is Test {
     address internal contractDeployer = makeAddr("contractDeployer");
 
     function setUp() public {
-       
         // deploy contract
         vm.prank(contractDeployer);
         swap = new Swap();
 
         // deposit funds to the contract to swap
         vm.deal(address(swap), 10 ether);
-    
     }
 
     function testTransferETH() public {
-       
         // WETH balance of Swap contract should be 0
         uint256 balance = IERC20(weth).balanceOf(address(swap));
         assertEq(balance, 0, "WETH balance of Swap contract not zero pre-transfer");
 
-        // transfer      
+        // transfer
         vm.prank(contractDeployer);
         swap.transferETH({to: weth, amount: 1 ether});
         uint256 wethBalance = IERC20(weth).balanceOf(address(swap));
-       
+
         // assert that ETH was transferred
         assertFalse(wethBalance == 0);
         assertFalse(address(swap).balance == 10 ether);
         console.log("Swap contract WETH balance post transfer: %s", wethBalance);
     }
-
 
     //function testGetAmountOutMin() public {
     //uint256 amount = 1 ether;
