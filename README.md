@@ -30,5 +30,6 @@ make deploy
 ## EVM Challenge
 
 
-
+## Notes
+https://ethereum.stackexchange.com/questions/19341/address-send-vs-address-transfer-best-practice-usage/38642#38642
 

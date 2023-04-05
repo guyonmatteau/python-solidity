@@ -10,49 +10,38 @@ import {Swap} from "src/Swap.sol";
 contract SwapTest is Test {
     Swap internal swap;
 
-    // hardcode addresses from polygon mainnet for forktesting
-    // this way it's only possible to test against a fork, not unit
-    address internal constant quickswap = 0xa5E0829CaCEd8fFDD4De3c43696c57F7D7A678ff;
-    address internal constant sushiswap = 0x1b02dA8Cb0d097eB8D57A175b88c7D8b47997506;
-    0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2
-    address internal constant weth = 0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619;
-    address internal constant usdc = 0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174;
+    // token address on mainnet
+    address internal constant weth = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
 
-    //Utils internal utils;
-    address payable[] internal users;
-    address internal account0;
-    address internal account1;
-    address internal account2;
+    // generate addresses for testing
+    address internal contractDeployer = makeAddr("contractDeployer");
 
     function setUp() public {
-        
-        account0 = address(100);
-        
-        //hoax is equivalent of deal + prank
-        hoax(account0, 88 wei);
-
-        //vm.prank(account0); 
+       
+        // deploy contract
+        vm.prank(contractDeployer);
         swap = new Swap();
 
-        account1 = address(200);
-        account2 = address(300);
-        vm.label(account0, "Account 0");
-        
-        vm.deal(address(swap), 2 ether);
-        vm.deal(account0, 4 ether);
-        assertEq(address(account0).balance, 4 ether);
-        assertEq(address(account1).balance, 0 ether);
+        // deposit funds to the contract to swap
+        vm.deal(address(swap), 10 ether);
+    
     }
 
     function testTransferETH() public {
-        console.log(2);
-        uint256 balance = IERC20(weth).balanceOf(account0);
-        console.log(balance);
+       
+        // WETH balance of Swap contract should be 0
+        uint256 balance = IERC20(weth).balanceOf(address(swap));
+        assertEq(balance, 0, "WETH balance of Swap contract not zero pre-transfer");
 
-        //assertEq(IERC20(weth).balanceOf(account0), 0 ether);
+        // transfer      
+        vm.prank(contractDeployer);
         swap.transferETH({to: weth, amount: 1 ether});
-        
-        assertEq(address(weth).balance, 1 ether);
+        uint256 wethBalance = IERC20(weth).balanceOf(address(swap));
+       
+        // assert that ETH was transferred
+        assertFalse(wethBalance == 0);
+        assertFalse(address(swap).balance == 10 ether);
+        console.log("Swap contract WETH balance post transfer: %s", wethBalance);
     }
 
 
