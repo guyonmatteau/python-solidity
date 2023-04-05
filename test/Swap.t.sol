@@ -29,7 +29,7 @@ contract SwapTest is Test {
         uint256 balance = IERC20(weth).balanceOf(address(swap));
         assertEq(balance, 0, "WETH balance of Swap contract not zero pre-transfer");
 
-        // transfer
+        // swap ETH to WETH by transfering ETH
         vm.prank(contractDeployer);
         swap.transferETH({to: weth, amount: 1 ether});
         uint256 wethBalance = IERC20(weth).balanceOf(address(swap));
