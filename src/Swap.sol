@@ -69,7 +69,7 @@ contract Swap is Ownable {
 
     // @dev transfer method required to deposit into WETH contract
     function transferETH(address to, uint256 amount) external onlyOwner {
-       payable(to).transfer(amount);
+        payable(to).transfer(amount);
     }
 
     function withdrawETH() external onlyOwner {
