@@ -17,61 +17,42 @@ Contract requirements
 */
 
 contract Swap is Ownable {
-    function getAmountOutMin(address router, address tokenIn, address tokenOut, uint256 amount)
-        public
-        view
-        returns (uint256)
-    {
-        address[] memory path = new address[](2);
-        path[0] = tokenIn;
-        path[1] = tokenOut;
+    
+    // @dev transfer method required to deposit into WETH contract
+    function transferETH(address to, uint256 amount) external onlyOwner {
+        // this is already done by the deposit method
+        // IERC20(tokenIn).transferFrom(msg.sender, address(this), amountIn);
 
-        uint256[] memory amountsOut = IUniswapV2Router02(router).getAmountsOut(amount, path);
-
-        return amountsOut[path.length - 1];
+        // TODO add reentrancy safeguard
+        (bool success,) = to.call{value: amount}("");
+        require(success, "Transfer failed.");
     }
 
-    // @dev Estimate potential trade
-    function estimateTrade(address router1, address router2, address token1, address token2, uint256 amount)
-        external
-        view
-        returns (uint256)
-    {
-        uint256 amount1 = getAmountOutMin(router1, token1, token2, amount);
-        uint256 amount2 = getAmountOutMin(router2, token2, token1, amount1);
-        return amount2;
-    }
-
-    // swap v3
-    // https://uniswapv3book.com/docs/milestone_5/swap-fees/
+    // @dev swap amountIn of tokenIn for tokenOut using UniswapV3 router interface
     function swap(address _router, address tokenIn, address tokenOut, uint24 poolFee, uint256 amountIn)
         external
+        onlyOwner
         returns (uint256 amountOut)
     {
+        require(IERC20(tokenIn).balanceOf(address(this)) >= amountIn, "Insufficient tokens to perform swap");
+    
+        // instantiate UniSwapV3 router
         ISwapRouter router = ISwapRouter(_router);
-
-        IERC20(tokenIn).transferFrom(msg.sender, address(this), amountIn);
         IERC20(tokenIn).approve(address(router), amountIn);
-
+        
         ISwapRouter.ExactInputSingleParams memory params = ISwapRouter.ExactInputSingleParams({
             tokenIn: tokenIn,
             tokenOut: tokenOut,
             fee: poolFee,
-            recipient: msg.sender,
+            recipient: address(this),
             deadline: block.timestamp,
             amountIn: amountIn,
             amountOutMinimum: 0,
             sqrtPriceLimitX96: 0
         });
-
+        
+        // do actual swap
         amountOut = router.exactInputSingle(params);
-    }
-
-    // @dev transfer method required to deposit into WETH contract
-    function transferETH(address to, uint256 amount) external onlyOwner {
-        // TODO add reentrancy safeguard
-        (bool success,) = to.call{value: amount}("");
-        require(success, "Transfer failed.");
     }
 
     function withdrawETH() external onlyOwner {
