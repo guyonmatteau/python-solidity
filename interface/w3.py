@@ -86,9 +86,17 @@ class Provider:
         tx_hash = self.w3.eth.send_raw_transaction(signed_tx.rawTransaction)
         logger.info(self.w3.to_hex(tx_hash))
 
+    def deploy(self, contract: str) -> bool:
+        """Deploy contract to blockchain."""
+        with open(f"src/{contract}.sol", "r") as file:
+            content = f.read()
+            
+
+
+
 
 class Contract(Provider):
-    """Class to interact with contract on blockchain."""
+    """Class to interact with existing contract on blockchain."""
 
     def __init__(
         self,
