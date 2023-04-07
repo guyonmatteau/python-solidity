@@ -1,11 +1,11 @@
 import logging
 import os
 import sys
-import json
 from configparser import ConfigParser
 
 import requests
 from dotenv import load_dotenv
+from solcx import compile_files, install_solc
 from web3 import Web3
 
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
@@ -15,7 +15,9 @@ logger = logging.getLogger(__name__)
 class Provider:
     """Class to interact with blockchain."""
 
-    def __init__(self, chain: str, fork: bool = True, proxy: bool = False):
+    def __init__(
+        self, chain: str, fork: bool = True, proxy: bool = False
+    ) -> "Provider":
         """Instantiate blockchain provider. After instantation, all blockchain
         functions are available under Provider.w3.eth., e.g.
         Provider.w3.eth.get_balance(address)
@@ -60,7 +62,7 @@ class Provider:
         if not self.w3.is_connected():
             raise ConnectionError(f"Could not connect to {self.rpc_url}")
 
-    def transfer(self, sender: str, to: str, amount: int):
+    def transfer(self, sender: str, to: str, amount: int) -> None:
         """Send ETH from sender to recipient. This required
         the private key of the sender in env var PRIVATE_KEY."""
 
@@ -76,8 +78,8 @@ class Provider:
             "nonce": nonce,
             "to": self.w3.to_checksum_address(to),
             "value": self.w3.to_wei(amount, "ether"),
-            'gas': 2000000,
-            'gasPrice': self.w3.to_wei('50', 'gwei')
+            "gas": 2000000,
+            "gasPrice": self.w3.to_wei("50", "gwei"),
         }
 
         signed_tx = self.w3.eth.account.sign_transaction(tx, private_key)
@@ -86,70 +88,53 @@ class Provider:
         tx_hash = self.w3.eth.send_raw_transaction(signed_tx.rawTransaction)
         logger.info(self.w3.to_hex(tx_hash))
 
-    def deploy(self, contract: str) -> bool:
-        """Deploy contract to blockchain."""
-        with open(f"src/{contract}.sol", "r") as file:
-            content = f.read()
-            
+    def deploy(self, contract: str, deployer: str = None, gas: int = 2000000) -> None:
+        """Compile contract and deploy to blockchain."""
+        from_ = deployer or os.environ["ACCOUNT"]
 
+        private_key = os.environ.get("PRIVATE_KEY")
+        if private_key is None:
+            raise KeyError("Private key of sender not found in PRIVATE_KEY env var")
 
-
-
-class Contract(Provider):
-    """Class to interact with existing contract on blockchain."""
-
-    def __init__(
-        self,
-        address: str,
-        name: str = None,
-        chain: str = "main",
-        fork: bool = True,
-        proxy: bool = False,
-    ):
-        """Instantiate contract instance with ABI from Etherscan.
-        After instantiation all contracts functions are available under
-        the `functions` attribute."""
-        super().__init__(chain=chain, fork=fork, proxy=proxy)
-        self.address = address
-        self.abi = (
-            self._abi_local()
-            if name is not None
-            else self._abi_etherscan(address=self.address)
-        )
-        self.functions = self.w3.eth.contract(
-            address=self.w3.to_checksum_address(self.address), abi=self.abi
-        ).functions
-
-    def _abi_local(self, name: str = "Swap") -> str:
-        """Get contract ABI from locally compiled contract."""
-        path = f"out/{name}.sol/{name}.json"
-        logger.info(f"Getting contract ABI from source at {path}")
-        with open(path, "r") as f:
-            abi = json.load(f)["abi"]
-        return abi
-
-    def _abi_etherscan(self, address) -> str:
-        """Get contract ABI from block explorer."""
-        # NB: this does not work for ERC20 that use a proxy (e.g. USDC)
-        url = self.config.get("url", "block_explorer")
-        api_key = os.environ.get("BLOCK_EXPLORER_API_KEY", None)
-
-        logger.info(f"Getting contract ABI for {address} from {url}")
-        if api_key is None:
-            raise KeyError(
-                "BLOCK_EXPLORER_API_KEY needs to be set to get ABI from Block explorer"
-            )
-
-        data = {
-            "module": "contract",
-            "action": "getabi",
-            "address": address,
-            "apikey": api_key,
+        contract = self._compile_contract(contract=contract)
+        nonce = self.w3.eth.get_transaction_count(from_)
+        tx_data = {
+            "chainId": self.w3.eth.chain_id,
+            "gasPrice": self.w3.eth.gas_price,
+            "gas": gas,
+            "from": from_,
+            "nonce": nonce,
         }
-        r = requests.get(url, data=data, verify=False)
-        abi = r.json()["result"]
+        tx = contract.constructor().build_transaction(tx_data)
+        signed_tx = self.w3.eth.account.sign_transaction(tx, private_key=private_key)
 
-        if abi == "Contract source code not verified":
-            raise ValueError(f"Address {address} not verified on {url}")
+        # send transaction
+        tx_hash = self.w3.eth.send_raw_transaction(signed_tx.rawTransaction)
+        tx_receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash)
+        contract_address = tx_receipt["contractAddress"]
 
-        return abi
+        logger.info(f"Contract deployed to: {contract_address}")
+        logger.info(f"Transaction receipt: {tx_receipt}")
+
+    def _compile_contract(self, contract: str) -> "Web3._utils.datatypes.Contract":
+        """Compile contract from source."""
+        file_path = f"src/{contract}.sol"
+
+        compiler_version = "0.8.17"
+        install_solc(compiler_version)
+
+        # read remappings from file such that we do not need to maintain them in
+        # multiple places. Slice off last whiteline
+        remappings = open("remappings.txt").read().split("\n")[:-1]
+
+        compiled_contract = compile_files(
+            source_files=[file_path],
+            output_values=["abi", "bin"],
+            import_remappings=remappings,
+            solc_version=compiler_version,
+        )[f"{file_path}:{contract}"]
+
+        contract = self.w3.eth.contract(
+            abi=compiled_contract["abi"], bytecode=compiled_contract["bin"]
+        )
+        return contract

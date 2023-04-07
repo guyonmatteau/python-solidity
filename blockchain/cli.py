@@ -1,5 +1,7 @@
-"""Utility script to get balance of ETH or ERC20 token at given address."""
-from w3 import Contract, Provider
+"""Utility scripts to get balance of ETH or ERC20 token at given address."""
+from blockchain.provider import Provider
+from blockchain.contract import Contract
+
 import click
 
 
@@ -39,6 +41,7 @@ def balance_of(token: str, address: str, chain: str, fork: bool) -> None:
 def transfer(sender: str, to: str, amount: int, chain: str, fork: bool):
     provider = Provider(chain=chain, fork=fork)
     provider.transfer(sender=sender, to=to, amount=amount)
+
 
 @click.group()
 def cli():
