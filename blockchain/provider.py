@@ -64,7 +64,7 @@ class Provider:
 
         logger.info(f"Connected to chain {self.chain}: {self.w3.is_connected()}")
         if not self.w3.is_connected():
-            raise ConnectionError(f"Could not connect to {self.rpc_url}")
+            raise ConnectionError(f"Could not connect to chain on {self.rpc_url}")
 
     def transfer(self, sender: str, to: str, amount: int) -> None:
         """Send ETH from sender to recipient. This required

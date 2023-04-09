@@ -9,10 +9,14 @@ import {Swap} from "contracts/Swap.sol";
 contract SwapTest is Test {
     Swap internal swap;
 
-    // token address on mainnet
-    address internal constant weth = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
+    // routers on mainnet
     address internal constant uniswapv3 = 0xE592427A0AEce92De3Edee1F18E0157C05861564;
+    address internal constant sushiswap = 0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F;
+
+    // ERC20s on mainnet
+    address internal constant weth = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
     address internal constant usdc = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
+    address internal constant usdt = 0xdAC17F958D2ee523a2206206994597C13D831ec7;
 
     // generate addresses for testing
     address internal contractDeployer = makeAddr("contractDeployer");
@@ -52,7 +56,7 @@ contract SwapTest is Test {
         uint256 usdcBalance = IERC20(usdc).balanceOf(address(swap));
         assertEq(usdcBalance, 0, "USDC balance of Swap contract not zero pre-swap");
 
-        // perform swapj
+        // perform swap
         vm.prank(contractDeployer);
         uint256 tokensOut =
             swap.swap({_router: uniswapv3, tokenIn: weth, tokenOut: usdc, poolFee: 3000, amountIn: 1 ether});
@@ -64,13 +68,25 @@ contract SwapTest is Test {
         console.log("USDC balance post swap: %s", tokensOut);
     }
 
-    //function testGetAmountOutMin() public {
-    //uint256 amount = 1 ether;
-    //arbitrage.getAmountOutMin({router: quickswap, tokenIn: weth, tokenOut: usdc, amount: amount});
-    //}
+    // swap USDC for USDT
+    function testSwapStables() public {
+        // setup some USDC for the contract
+        testSwap();
 
-    //function testEstimateTrade() public {
-    //uint256 amount = 1 ether;
-    //arbitrage.estimateTrade({router1: quickswap, router2: sushiswap, token1: weth, token2: usdc, amount: amount});
-    //}
+        // make sure that initial USDT balance is zero
+        uint256 usdtBalance = IERC20(usdt).balanceOf(address(swap));
+        assertEq(usdtBalance, 0, "USDT balance of Swap contract not zero pre-swap");
+
+        // swap usdc for usdt. USDC denotes its value in 6 decimals, so if we pick 1 gwei = 1e9 wei = 1000$
+        vm.prank(contractDeployer);
+        uint256 tokensOut =
+            swap.swap({_router: sushiswap, tokenIn: usdc, tokenOut: usdt, poolFee: 3000, amountIn: });
+
+        // assert that USDC was properly swapped for USDT
+        uint256 newUSDTBalance = IERC20(usdt).balanceOf(address(swap));
+        assertFalse(newUSDTBalance == 0, "USDT balance still zero post-swap");
+        
+        console.log("USDT balance post swap: %s", tokensOut);
+    }
+
 }

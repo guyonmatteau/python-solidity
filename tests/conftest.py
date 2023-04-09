@@ -3,6 +3,7 @@ import os
 
 import pytest
 
+from blockchain.abi import ERC20 as ABI
 from blockchain.contract import Contract
 from blockchain.provider import Provider
 from blockchain.utils import get_config
@@ -46,7 +47,7 @@ def erc20() -> ERC20:
     """Provide ERC20 contract instances of ERC20s, accessible in one object."""
     tokens = get_config("main")["tokens"]
     erc20s = ERC20()
-    erc20s.weth = Contract(address=tokens["weth"])
-    erc20s.usdc = Contract(address=tokens["usdc"])
-    erc20s.usdt = Contract(address=tokens["usdt"])
+    erc20s.weth = Contract(address=tokens["weth"], abi=ABI)
+    erc20s.usdc = Contract(address=tokens["usdc"], abi=ABI)
+    erc20s.usdt = Contract(address=tokens["usdt"], abi=ABI)
     return erc20s

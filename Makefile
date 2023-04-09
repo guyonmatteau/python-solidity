@@ -31,7 +31,7 @@ deploy.sol:
 	forge create \
 	--private-key ${PRIVATE_KEY} \
 	--rpc-url ${RPC_URL}${RPC_API_KEY} \
-	src/${CONTRACT}.sol:${CONTRACT}
+	contracts/${CONTRACT}.sol:${CONTRACT}
 
 # Python targets
 lint.py:

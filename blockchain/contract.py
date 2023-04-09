@@ -18,6 +18,7 @@ class Contract(Provider):
         self,
         address: str,
         name: str = None,
+        abi: dict = None,
         chain: str = "main",
         fork: bool = True,
         proxy: bool = False,
@@ -28,7 +29,7 @@ class Contract(Provider):
         the `functions` attribute."""
         super().__init__(chain=chain, fork=fork, proxy=proxy)
         self.address = self.w3.to_checksum_address(address)
-        self.abi = (
+        self.abi = abi or (
             self._abi_etherscan(address=self.address)
             if name is None
             else self._abi_local()
