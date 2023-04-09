@@ -1,4 +1,4 @@
-"""Utility scripts to get balance of ETH or ERC20 token at given address."""
+"""Make Provider and Contract class available on the command line."""
 from blockchain.provider import Provider
 from blockchain.contract import Contract
 
@@ -7,8 +7,6 @@ import click
 
 @click.command()
 @click.option("--address")
-@click.option("--chain", help="Chain of address: main, goerli, ...", default="main")
-@click.option("--fork", help="Whether to use a fork or not", default=True)
 def balance(address, chain, fork) -> None:
     """Get native chain asset balance at address."""
     provider = Provider(chain=chain, fork=fork)
@@ -21,8 +19,6 @@ def balance(address, chain, fork) -> None:
 @click.command()
 @click.option("--token", "-t", help="ERC20 token address")
 @click.option("--address", "-a", help="Address to get balance for")
-@click.option("--chain", help="Chain the ERC20 resides on", default="main")
-@click.option("--fork", help="Whether to use a fork or not", default=True)
 def balance_of(token: str, address: str, chain: str, fork: bool) -> None:
     """Get ERC20 token balance of address."""
     contract = Contract(address=token, chain=chain, fork=fork)
@@ -36,14 +32,14 @@ def balance_of(token: str, address: str, chain: str, fork: bool) -> None:
 @click.option("--sender", help="Address to transfer from")
 @click.option("--to", help="Address to deposit funds to")
 @click.option("--amount", help="Amount to transfer in ether", type=int)
-@click.option("--chain", help="Chain the ERC20 resides on", default="main")
-@click.option("--fork", help="Whether to use a fork or not", default=True)
 def transfer(sender: str, to: str, amount: int, chain: str, fork: bool):
     provider = Provider(chain=chain, fork=fork)
     provider.transfer(sender=sender, to=to, amount=amount)
 
 
 @click.group()
+@click.option("--chain", help="Chain of address: main, goerli, ...", default="main")
+@click.option("--fork", help="Whether to use a fork or not", default=True)
 def cli():
     """Utility commands."""
     pass

@@ -4,7 +4,7 @@ pragma solidity ^0.8.17;
 import "@forge-std/Test.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {Swap} from "src/Swap.sol";
+import {Swap} from "contracts/Swap.sol";
 
 contract SwapTest is Test {
     Swap internal swap;

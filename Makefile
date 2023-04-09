@@ -12,19 +12,36 @@ export
 # GLOBALS
 CONTRACT=Swap
 
-# TARGETS
-build:
+# Foundry targets
+build.sol:
 	forge build -c src
 
-test:
+format.sol:
+	forge fmt
+
+test.sol:
 	forge test -vvvvv
 
-testfork:
+test.sol.fork:
 	forge test -vvvv --fork-url ${RPC_URL}${RPC_API_KEY}
 
-deploy:
+deploy.sol:
 	forge create \
 	--private-key ${PRIVATE_KEY} \
 	--rpc-url ${RPC_URL}${RPC_API_KEY} \
 	src/${CONTRACT}.sol:${CONTRACT}
+
+# Python module targets
+lint.py:
+
+format.py
+
+test.py.unit:
+
+test.py.script:
+
+test.py:
+	test.py.unit
+	test.py.script
+
 

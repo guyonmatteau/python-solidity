@@ -1,0 +1,7 @@
+-r requirements.txt
+
+# requirements for linting, testing, formatting
+pytest
+pylint
+black==22.12.0
+isort
