@@ -116,7 +116,6 @@ def test_swap_usdc_usdt_sushiswap(erc20):
     ).call()
 
     assert usdt_balance_post_swap > usdt_balance_pre_swap, "USDT balance not increased"
-    # assert erc20.usdc.functions.balanceOf(swap_contract.address).call() == 0
 
 
 @pytest.mark.dependency(depends=["test_swap_usdc_usdt_sushiswap"])
@@ -137,6 +136,7 @@ def test_transfer_erc20(erc20):
         swap_contract.w3.to_checksum_address(eoa),
         swap_contract_usdt_balance,
     ).transact()
+
     assert (
         erc20.usdt.functions.balanceOf(eoa).call() == swap_contract_usdt_balance
     ), "USDT transfer failed"
