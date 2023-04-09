@@ -2,6 +2,7 @@ import logging
 import os
 import sys
 from configparser import ConfigParser
+import toml
 
 import requests
 from dotenv import load_dotenv
@@ -31,6 +32,7 @@ class Provider:
         self.cert = os.environ.get("CA_CERT")
         self.config = ConfigParser()
         config_path = f"conf/{chain}.ini"
+        self.contracts_folder = toml.load('foundry.toml')['profile']['default']['src']
         logger.info(f"Reading config from {config_path}")
         self.config.read(config_path)
         if self.config is None:
@@ -88,8 +90,11 @@ class Provider:
         tx_hash = self.w3.eth.send_raw_transaction(signed_tx.rawTransaction)
         logger.info(self.w3.to_hex(tx_hash))
 
-    def deploy(self, contract: str, deployer: str = None, gas: int = 2000000) -> None:
-        """Compile contract and deploy to blockchain."""
+    def deploy(self, contract: str, deployer: str = None, gas: int = 2000000) -> str:
+        """Compile contract and deploy to blockchain.
+        
+        Returns:
+            str: address to which the contract is deployed."""
         from_ = deployer or os.environ["ACCOUNT"]
 
         private_key = os.environ.get("PRIVATE_KEY")
@@ -114,17 +119,20 @@ class Provider:
         contract_address = tx_receipt["contractAddress"]
 
         logger.info(f"Contract deployed to: {contract_address}")
-        logger.info(f"Transaction receipt: {tx_receipt}")
+        logger.debug(f"Transaction receipt: {tx_receipt}")
+        return contract_address
 
     def _compile_contract(self, contract: str) -> "Web3._utils.datatypes.Contract":
         """Compile contract from source."""
-        file_path = f"src/{contract}.sol"
+        
+        # determine contrct folder from Foundry config
+        file_path = f"{self.contracts_folder}/{contract}.sol"
 
         compiler_version = "0.8.17"
         install_solc(compiler_version)
 
         # read remappings from file such that we do not need to maintain them in
-        # multiple places. Slice off last whiteline
+        # multiple places (Foundry keeps them in remappings.txt). 
         remappings = open("remappings.txt").read().split("\n")[:-1]
 
         compiled_contract = compile_files(

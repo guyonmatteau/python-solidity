@@ -34,11 +34,10 @@ deploy.sol:
 # Python module targets
 lint.py:
 
-format.py
-
 test.py.unit:
 
 test.py.script:
+	pytest tests/script
 
 test.py:
 	test.py.unit

@@ -28,11 +28,7 @@ class Contract(Provider):
         the `functions` attribute."""
         super().__init__(chain=chain, fork=fork, proxy=proxy)
         self.address = address
-        self.abi = (
-            self._abi_local()
-            if name is not None
-            else self._abi_etherscan(address=self.address)
-        )
+        self.abi = self._abi_etherscan(address=self.address) if name is None else self._abi_local()
         self.functions = self.w3.eth.contract(
             address=self.w3.to_checksum_address(self.address), abi=self.abi
         ).functions
