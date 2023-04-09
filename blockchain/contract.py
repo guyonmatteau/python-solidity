@@ -48,7 +48,8 @@ class Contract(Provider):
 
     def _abi_etherscan(self, address) -> str:
         """Get contract ABI from block explorer."""
-        # NB: this does not work for ERC20 that use a proxy (e.g. USDC)
+        # NB: this does not work for ERC20 that use a proxy (e.g. USDC),
+        # in that case manually pass ABI
         url = self.config["url"]["block_explorer"]
         api_key = os.environ.get("BLOCK_EXPLORER_API_KEY", None)
 

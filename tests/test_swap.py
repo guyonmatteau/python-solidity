@@ -1,4 +1,5 @@
-"""Tests to demonstrate the Swap functionality from Python perspective."""
+"""Chained tests to demonstrate the required Swap functionality as 
+described in the assignment."""
 import pytest
 
 from blockchain.contract import Contract
@@ -11,10 +12,10 @@ CONFIG = get_config(path="conf/main.toml")
 def test_deploy(provider):
     """Test contract deployment by deploying contract
     and asserting ${ACCOUNT} is the owner."""
-    contract_address = provider.deploy(contract="Swap")
+    contract_address, abi = provider.deploy(contract="Swap")
 
     pytest.deployment.contract = swap_contract = Contract(
-        address=contract_address, name="Swap"
+        address=contract_address, abi=abi
     )
     owner = swap_contract.functions.owner().call()
 
@@ -76,7 +77,7 @@ def test_swap_weth_usdc_uniswap(erc20):
     # perform swap
     pool_fee = 3000
     amount = int(1e18)
-    swap_contract.functions.swap(
+    swap_contract.functions.swapUniV3(
         swap_contract.w3.to_checksum_address(CONFIG["routers"]["uniswapv3"]),
         erc20.weth.address,
         erc20.usdc.address,
@@ -88,33 +89,26 @@ def test_swap_weth_usdc_uniswap(erc20):
         swap_contract.address
     ).call()
 
-    # note USDC only uses 6 decimals
+    # note USDC and USDT use 6 decimals
     assert usdc_balance_post_swap > usdc_balance_pre_swap, "USDC balance not increased"
 
 
 @pytest.mark.dependency(depends=["test_swap_weth_usdc_uniswap"])
 def test_swap_usdc_usdt_sushiswap(erc20):
-    """Testing the actual contract: swap USDC for USDT on Sushiswap."""
+    """Test swapping USDC for USDT on Sushiswap."""
     swap_contract = pytest.deployment.contract
     swap_contract_usdc_balance = erc20.usdc.functions.balanceOf(
         swap_contract.address
     ).call()
 
     usdt_balance_pre_swap = erc20.usdt.functions.balanceOf(swap_contract.address).call()
+    assert usdt_balance_pre_swap == 0, "USDT balance of contract not zero pre swap"
 
-    # perform swap
-    pool_fee = 3000
-    import logging
-
-    logging.info(swap_contract_usdc_balance)
-    amount = int(swap_contract_usdc_balance / 10)
-
-    swap_contract.functions.swap(
+    swap_contract.functions.swapUniV2(
         swap_contract.w3.to_checksum_address(CONFIG["routers"]["sushiswap"]),
         erc20.usdc.address,
         erc20.usdt.address,
-        pool_fee,
-        amount,
+        swap_contract_usdc_balance,
     ).transact()
 
     usdt_balance_post_swap = erc20.usdt.functions.balanceOf(
@@ -122,9 +116,27 @@ def test_swap_usdc_usdt_sushiswap(erc20):
     ).call()
 
     assert usdt_balance_post_swap > usdt_balance_pre_swap, "USDT balance not increased"
+    # assert erc20.usdc.functions.balanceOf(swap_contract.address).call() == 0
 
 
 @pytest.mark.dependency(depends=["test_swap_usdc_usdt_sushiswap"])
 def test_transfer_erc20(erc20):
     """Assert that the contract can send an ERC20 address to an EOA."""
-    pass
+    swap_contract = pytest.deployment.contract
+    swap_contract_usdt_balance = erc20.usdt.functions.balanceOf(
+        swap_contract.address
+    ).call()
+
+    # some random EOA provided by Hardhat
+    eoa = "0x976EA74026E726554dB657fA54763abd0C3a0aa9"
+    assert erc20.usdt.functions.balanceOf(eoa).call() == 0
+
+    # send output of sushiswap to externally owned address
+    swap_contract.functions.transferERC20(
+        erc20.usdt.address,
+        swap_contract.w3.to_checksum_address(eoa),
+        swap_contract_usdt_balance,
+    ).transact()
+    assert (
+        erc20.usdt.functions.balanceOf(eoa).call() == swap_contract_usdt_balance
+    ), "USDT transfer failed"

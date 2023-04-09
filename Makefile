@@ -15,33 +15,33 @@ include .env.${chain}
 export 
 
 # Solidity / Foundry targets
-build.sol:
+buildsol:
 	forge build -c src
 
-format.sol:
+formatsol:
 	forge fmt
 
-test.sol:
+testsol:
 	forge test -vvvvv
 
-test.sol.fork:
+testsolfork:
 	forge test -vvvv --fork-url ${RPC_URL}${RPC_API_KEY}
 
-deploy.sol:
+deploysol:
 	forge create \
 	--private-key ${PRIVATE_KEY} \
 	--rpc-url ${RPC_URL}${RPC_API_KEY} \
 	contracts/${CONTRACT}.sol:${CONTRACT}
 
 # Python targets
-lint.py:
+lintpy:
 	isort --recursive --check ${PYTHON_MODULE} ${PYTHON_TESTS}
 	black --check ${PYTHON_MODULE} ${PYTHON_TESTS}
 
-format.py:
+formatpy:
 	isort --recursive ${PYTHON_MODULE} ${PYTHON_TESTS}
 	black ${PYTHON_MODULE} ${PYTHON_TESTS}
 
-test.py:
+testpy:
 	pytest ${PYTHON_TESTS}
 

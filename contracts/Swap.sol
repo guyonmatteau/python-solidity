@@ -13,14 +13,14 @@ contract Swap is Ownable {
         path[0] = tokenIn;
         path[1] = tokenOut;
 
-        IUniswapV2Router02 uni = IUniswapV2Router02(_router);
-        IERC20(tokenIn).approve(address(_router), amount);
+        IUniswapV2Router02 router = IUniswapV2Router02(_router);
+        IERC20(tokenIn).approve(address(router), amount);
 
-        uint256[] memory amountsOut = uni.getAmountsOut(amount, path);
-
+        uint256[] memory amountsOut = router.getAmountsOut(amount, path);
         uint256 amountOut = amountsOut[path.length - 1];
 
-        uint256[] memory amounts = uni.swapTokensForExactTokens({
+        // do actual swap
+        uint256[] memory amounts = router.swapTokensForExactTokens({
             amountOut: amountOut,
             amountInMax: 2 gwei,
             path: path,
@@ -32,7 +32,6 @@ contract Swap is Ownable {
     }
 
     // @dev transfer method required to deposit into WETH contract
-
     function transferETH(address to, uint256 amount) external onlyOwner {
         // this is already done by the deposit method
         // IERC20(tokenIn).transferFrom(msg.sender, address(this), amountIn);
@@ -43,7 +42,7 @@ contract Swap is Ownable {
     }
 
     // @dev swap amountIn of tokenIn for tokenOut using UniswapV3 router interface
-    function swap(address _router, address tokenIn, address tokenOut, uint24 poolFee, uint256 amountIn)
+    function swapUniV3(address _router, address tokenIn, address tokenOut, uint24 poolFee, uint256 amountIn)
         external
         onlyOwner
         returns (uint256 amountOut)
@@ -81,6 +80,10 @@ contract Swap is Ownable {
     function getTokenBalance(address tokenAddress) external view returns (uint256) {
         uint256 balance = IERC20(tokenAddress).balanceOf(address(this));
         return balance;
+    }
+
+    function transferERC20(address tokenAddress, address recipient, uint256 amount) external onlyOwner {
+        IERC20(tokenAddress).transferFrom({from: address(this), to: recipient, amount: amount});
     }
 
     receive() external payable {}

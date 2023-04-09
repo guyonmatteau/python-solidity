@@ -1,7 +1,6 @@
 import logging
 import os
 import sys
-from configparser import ConfigParser
 
 import requests
 from dotenv import load_dotenv
@@ -92,7 +91,9 @@ class Provider:
         tx_hash = self.w3.eth.send_raw_transaction(signed_tx.rawTransaction)
         logger.info(self.w3.to_hex(tx_hash))
 
-    def deploy(self, contract: str, deployer: str = None, gas: int = 2000000) -> str:
+    def deploy(
+        self, contract: str, deployer: str = None, gas: int = 2000000
+    ) -> (str, dict):
         """Compile contract and deploy to blockchain.
 
         Returns:
@@ -103,7 +104,7 @@ class Provider:
         if private_key is None:
             raise KeyError("Private key of sender not found in PRIVATE_KEY env var")
 
-        contract = self._compile_contract(contract=contract)
+        contract, abi = self._compile_contract(contract=contract)
         nonce = self.w3.eth.get_transaction_count(from_)
         tx_data = {
             "chainId": self.w3.eth.chain_id,
@@ -122,15 +123,17 @@ class Provider:
 
         logger.info(f"Contract deployed to: {contract_address}")
         logger.debug(f"Transaction receipt: {tx_receipt}")
-        return contract_address
+        return contract_address, abi
 
-    def _compile_contract(self, contract: str) -> "Web3._utils.datatypes.Contract":
+    def _compile_contract(
+        self, contract: str
+    ) -> ("Web3._utils.datatypes.Contract", dict):
         """Compile contract from source."""
 
         # determine contract folder from Foundry config
         file_path = f"{self.contracts_folder}/{contract}.sol"
 
-        compiler_version = "0.8.17"
+        compiler_version = self.config["solidity"]["compiler_version"]
         install_solc(compiler_version)
 
         # read remappings from file such that we do not need to maintain them in
@@ -147,4 +150,4 @@ class Provider:
         contract = self.w3.eth.contract(
             abi=compiled_contract["abi"], bytecode=compiled_contract["bin"]
         )
-        return contract
+        return contract, compiled_contract["abi"]
