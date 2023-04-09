@@ -1,8 +1,8 @@
 """Make Provider and Contract class available on the command line."""
-from blockchain.provider import Provider
-from blockchain.contract import Contract
-
 import click
+
+from blockchain.contract import Contract
+from blockchain.provider import Provider
 
 
 @click.command()

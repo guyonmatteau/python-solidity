@@ -2,6 +2,6 @@
 
 # requirements for linting, testing, formatting
 pytest==7.2.2
-pylint
+pytest-dependency==0.5.1
 black==22.12.0
-isort
+isort==5.12.0

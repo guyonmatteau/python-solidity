@@ -1,7 +1,7 @@
+import json
 import logging
 import os
 import sys
-import json
 
 import requests
 
@@ -27,10 +27,14 @@ class Contract(Provider):
         After instantiation all contracts functions are available under
         the `functions` attribute."""
         super().__init__(chain=chain, fork=fork, proxy=proxy)
-        self.address = address
-        self.abi = self._abi_etherscan(address=self.address) if name is None else self._abi_local()
+        self.address = self.w3.to_checksum_address(address)
+        self.abi = (
+            self._abi_etherscan(address=self.address)
+            if name is None
+            else self._abi_local()
+        )
         self.functions = self.w3.eth.contract(
-            address=self.w3.to_checksum_address(self.address), abi=self.abi
+            address=self.address, abi=self.abi
         ).functions
 
     def _abi_local(self, name: str = "Swap") -> str:
@@ -44,7 +48,7 @@ class Contract(Provider):
     def _abi_etherscan(self, address) -> str:
         """Get contract ABI from block explorer."""
         # NB: this does not work for ERC20 that use a proxy (e.g. USDC)
-        url = self.config.get("url", "block_explorer")
+        url = self.config["url"]["block_explorer"]
         api_key = os.environ.get("BLOCK_EXPLORER_API_KEY", None)
 
         logger.info(f"Getting contract ABI for {address} from {url}")

@@ -2,12 +2,13 @@ import logging
 import os
 import sys
 from configparser import ConfigParser
-import toml
 
 import requests
 from dotenv import load_dotenv
 from solcx import compile_files, install_solc
 from web3 import Web3
+
+from blockchain.utils import get_config
 
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -30,11 +31,12 @@ class Provider:
         """
         self.chain = chain
         self.cert = os.environ.get("CA_CERT")
-        self.config = ConfigParser()
-        config_path = f"conf/{chain}.ini"
-        self.contracts_folder = toml.load('foundry.toml')['profile']['default']['src']
+        config_path = f"conf/{chain}.toml"
         logger.info(f"Reading config from {config_path}")
-        self.config.read(config_path)
+        self.config = get_config(path=config_path)
+        self.contracts_folder = get_config(path="foundry.toml")["profile"]["default"][
+            "src"
+        ]
         if self.config is None:
             raise ValueError(f"Read empty config from {config_path}.")
 
@@ -44,9 +46,9 @@ class Provider:
 
         if fork:
             logger.info(f"Using local fork from {chain}")
-            self.rpc_url = self.config.get("url", "localhost")
+            self.rpc_url = self.config["url"]["localhost"]
         else:
-            self.rpc_root = self.config.get("url", "rpc")
+            self.rpc_root = self.config["url"]["rpc"]
             rpc_api_key = os.environ["RPC_API_KEY"]
             self.rpc_url = f"{self.rpc_root}{rpc_api_key}"
         logger.info(f"RPC url: {self.rpc_url}")
@@ -92,7 +94,7 @@ class Provider:
 
     def deploy(self, contract: str, deployer: str = None, gas: int = 2000000) -> str:
         """Compile contract and deploy to blockchain.
-        
+
         Returns:
             str: address to which the contract is deployed."""
         from_ = deployer or os.environ["ACCOUNT"]
@@ -124,15 +126,15 @@ class Provider:
 
     def _compile_contract(self, contract: str) -> "Web3._utils.datatypes.Contract":
         """Compile contract from source."""
-        
-        # determine contrct folder from Foundry config
+
+        # determine contract folder from Foundry config
         file_path = f"{self.contracts_folder}/{contract}.sol"
 
         compiler_version = "0.8.17"
         install_solc(compiler_version)
 
         # read remappings from file such that we do not need to maintain them in
-        # multiple places (Foundry keeps them in remappings.txt). 
+        # multiple places (Foundry keeps them in remappings.txt).
         remappings = open("remappings.txt").read().split("\n")[:-1]
 
         compiled_contract = compile_files(
