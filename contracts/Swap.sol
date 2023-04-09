@@ -5,9 +5,33 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
+import "@sushiswap/sushiswap/protocols/sushiswap/contracts/interfaces/IUniswapV2Router02.sol";
 
 contract Swap is Ownable {
+    function swapUniV2(address _router, address tokenIn, address tokenOut, uint256 amount)
+        external
+        onlyOwner
+        returns (uint256 amountOut)
+    {
+        uint256 amountOut = getAmountOutMin(_router, tokenIn, tokenOut, amount);
+        return amountOut;
+    }
+
+    function getAmountOutMin(address router, address tokenIn, address tokenOut, uint256 amount)
+        public
+        view
+        returns (uint256)
+    {
+        address[] memory path = new address[](2);
+        path[0] = tokenIn;
+        path[1] = tokenOut;
+
+        uint256[] memory amountsOut = IUniswapV2Router02(router).getAmountsOut(amount, path);
+
+        return amountsOut[path.length - 1];
+    }
     // @dev transfer method required to deposit into WETH contract
+
     function transferETH(address to, uint256 amount) external onlyOwner {
         // this is already done by the deposit method
         // IERC20(tokenIn).transferFrom(msg.sender, address(this), amountIn);
