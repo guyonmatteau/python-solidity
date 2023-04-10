@@ -18,18 +18,16 @@ For example, if our input value equals `n = 6`, the function needs to return 8, 
 _No function selector_ implies that we need to use the fallback function of the contract, which will save us 4 bytes in runtime bytecode. The fallback function does not take any parameters, so as the problem statement states, the `uint265` input number `n` is passed as 32 bytes length calldata. In the case of no function selector and `n = 20`, calldata would thus be
 `0x00000000000000000000000000000000000000000000000000000000000014`, which is 20 in hexadecimal format padded to 32 bytes. 
 
-Given that there **exist valid solutions of length less than 50 bytes**, Solidity is obviously not the way to go. Compiling a simple empty contract, 
+Given that **there exist valid solutions of length less than 50 bytes**, Solidity is obviously not the way to go. Compiling a simple empty contract, e.g. 
 ```
 solc --bin-runtime Empty.sol
 ```
-already shows a byte length of few hundreds bytes. On [Github](https://github.com/drujensen/fib) (and related discussion on [Hackernews](https://news.ycombinator.com/item?id=18091655)) an interesting benchmark was done between all major programming languages - except Solidity. Mentioned language are all non-EVM based and thus do not have to deal with gas, only the time- and space-complexity matters. Now recursion has a time complexity of O(x^n), which means that the transaction possibly
-consume an infinite amount of gas. A more suffisticated approach is memoization, which only requires one for-loop, thereby reducing the time complexity to O(n). An example can be found in `Memoization.sol` (not using the fallback functiOn), but this contract too will compile to hundreds of bytes. It does help though, in providing insights in the way to move forward.
-
-In pseudocode the memoic approach of returning the `n`-th index of the Fibonacci sequence would boild down to
+already shows a byte length of few hundreds bytes. On [Github](https://github.com/drujensen/fib) (and related discussion on [Hackernews](https://news.ycombinator.com/item?id=18091655)) an interesting benchmark was done between all major programming languages to compute the Fibonacci number, but mainly in a recursvie manner. Mentioned language are all non-EVM based and thus do not have to deal with gas, only the time- and space-complexity matters. Now recursion has a time complexity of $$ \mathcal{O}(x^n) $$, which means that the transaction possibly
+consume an infinite amount of gas. A more suffisticated approach is memoization, which only requires one for-loop, thereby reducing the time complexity to $$ \mathcal{O}(n) $$. An example can be found in `Memoization.sol` (not using the fallback functiOn), but this contract too will compile to hundreds of bytes. It does help though, in providing insights in the way to move forward. In pseudocode the memoic approach of returning the `n`-th index of the Fibonacci sequence would boild down to something in the lines of
 ```
 contract Fibonacci {
 
-    fallback() payable external returns (bytes) {
+    fallback() payable external returns (bytes memory b) {
 
         if n is 0 or 1:
             b = n
@@ -43,7 +41,9 @@ contract Fibonacci {
     }
 ```
 
-This provides us insights in how we can construct the required components for the Opcode workflow:
+This provides us insights in how we can construct the required components for the workflow.
+
+**Opcode workflow:**
 1. Load calldata `n` to the stack
 2. If `n` is 0 or 1, jump to return
 3. Prepare for-loop by initializing variables
@@ -59,7 +59,7 @@ This provides us insights in how we can construct the required components for th
 Taking the opcodes workflow as described above, and constructing them separately. Note `stack[1]` is the top item of the stack.
 
 ### Load calldata to the top of stack
-``
+```
 PUSH1 
 CALLDATALOAD
 ```
