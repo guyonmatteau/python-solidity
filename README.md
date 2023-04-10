@@ -51,16 +51,17 @@ This will perform the following tests in a subsequent and dependent order.
 
 ### Future outline
 
-Ideas and potential next steps, out of scope for this assessment:
+Ideas and potential next steps for further development:
 
 - Contract
+  - Add logging of Events through Emit
   - Add modifiers for balance checks
-  - Add safety checks
+  - Assess vulnerabilities
   - Currently contract does swap (as per the assignment), but even if the swap results in a loss. In case of arbitrage one would want to revert the transaction if it is not at profit. This check  needs to be added.
   - Gas optimization
 - Module
   - Containerization / portability: build, test, and deploy the contract from a container to avoid "yes, but it worked on my machine".
-  - Basic CLI tool can be extended and uploaded to private registry for convenient internal usage across devs.
+  - Basic CLI tool can be extended and uploaded to private registry for convenient internal usage across devs within company.
   - Add pipeline for testing, linting and deployment
   - Add unit tests for the Python module itself.
 - Deployment 
