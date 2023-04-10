@@ -42,4 +42,5 @@ share/python-wheels/
 MANIFEST
 
 # jupyter notebook stuff
+Untitled.ipynb
 .ipynb_checkpoints*
