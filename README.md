@@ -13,14 +13,16 @@ This repository contains the effort for the technical assessment. Specifically:
 
 Hardhat is used to run a mainnet fork in a separate folder and window. [Foundry](https://book.getfoundry.sh/) is used to develop and test the smart contract. Pytest is used to test Python functionality and demonstrate the required functionality of the atomic swap.
 
-### Config
-`conf/` contains the config for the Python module to deploy the contract to the chain that corresponds to the name of the config file (i.e. mainnet in case of `conf/main.ini`). File `.env.example` contains an example of a config file to store secrets, where `example` should be replaced by the chain of choice and should correspond to the name of the config in `conf`. Thus, we can (hypothetically) create a secrets file `.env.polygon` and `conf/polygon.ini` to interact (deploy, transfer, test against, etc.) directly with the Polygon chain, either remote or a forked local version. For the assignment we only require the mainnet (i.e. `.env.main` and `conf/main.ini`).
+### Config and secrets
+`conf/` contains the config for the Python module to deploy the contract to the chain that corresponds to the name of the config file (i.e. mainnet in case of `conf/main.ini`). 
+
+File `.env.example` contains an example of a config file to store secrets, where `example` should be replaced by the chain of choice and should correspond to the name of the config in `conf`. Thus, we can (hypothetically) create a secrets file `.env.polygon` and `conf/polygon.ini` to interact (deploy, transfer, test against, etc.) directly with the Polygon chain, either remote or a forked local version. For the assignment we only require the mainnet (i.e. `.env.main` and `conf/main.ini`).
 
 _Note: In the config and code one will find traces of using self signed certificates for usage behind a proxy. I worked on both my personal laptop and work laptop on this assignment, and the latter runs behind a VPN._
 
 ### Smart contract
 
-`contracts/` and `test/` contain the smart contract to perform the atomic swap as described in the assignment. The contract uses the Router interface of UniswapV3 to act as router for UniswapV3 and UniswapV2 router for Sushiswap. The contracts functionalities are tested by `test/Swap.t.sol`. These tests are not really unit tests (integration tests rather), since they have the ERC20 addresses hardcoded, and thus require that one runs the Solidity tests against a mainnet fork:
+`contracts/` and `test/` contain the smart contract to perform the atomic swap as described in the assignment. The contract uses the Router interface of UniswapV3 to act as router for UniswapV3 and UniswapV2 router for Sushiswap. The contracts functionalities are tested with Solidity by `test/Swap.t.sol` (Python tests see below). These tests have the ERC20 addresses hardcoded, and thus require that one runs the Solidity tests against a mainnet fork:
 ```
 forge test -vvv --fork-url ${RPC_URL}${RPC_API_KEY}
 ```
