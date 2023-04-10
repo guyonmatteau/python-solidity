@@ -22,10 +22,10 @@ formatsol:
 	forge fmt
 
 testsol:
-	forge test -vvvvv
+	forge test -vvv
 
 testsolfork:
-	forge test -vvvv --fork-url ${RPC_URL}${RPC_API_KEY}
+	forge test -vv --fork-url ${RPC_URL}${RPC_API_KEY}
 
 deploysol:
 	forge create \

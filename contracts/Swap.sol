@@ -4,10 +4,41 @@ pragma solidity ^0.8.17;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
 import "@sushiswap/sushiswap/protocols/sushiswap/contracts/interfaces/IUniswapV2Router02.sol";
 
+using SafeERC20 for IERC20;
+
 contract Swap is Ownable {
+    // @dev transfer method required to deposit into WETH contract
+    function transfer(address to, uint256 amount) external onlyOwner {
+        // TODO add reentrancy safeguard
+        (bool success,) = to.call{value: amount}("");
+        require(success, "Transfer failed.");
+    }
+
+    function withdraw() external onlyOwner {
+        payable(msg.sender).transfer(address(this).balance);
+    }
+
+    function withdrawERC20(address token, uint256 amount) external onlyOwner {
+        transferERC20({token: token, recipient: address(this), amount: amount});
+    }
+
+    // @dev get ERC20 token balance of Swap contract
+    function getTokenBalance(address tokenAddress) external view returns (uint256) {
+        uint256 balance = IERC20(tokenAddress).balanceOf(address(this));
+        return balance;
+    }
+
+    function transferERC20(address token, address recipient, uint256 amount) public onlyOwner {
+        // USDT is a non-standard ERC20 token so need to use the safe library
+        IERC20(token).safeTransfer({to: recipient, value: amount});
+    }
+
+    receive() external payable {}
+
     function swapUniV2(address _router, address tokenIn, address tokenOut, uint256 amount) external returns (uint256) {
         address[] memory path = new address[](2);
         path[0] = tokenIn;
@@ -29,16 +60,6 @@ contract Swap is Ownable {
         });
 
         return amounts[path.length - 1];
-    }
-
-    // @dev transfer method required to deposit into WETH contract
-    function transferETH(address to, uint256 amount) external onlyOwner {
-        // this is already done by the deposit method
-        // IERC20(tokenIn).transferFrom(msg.sender, address(this), amountIn);
-
-        // TODO add reentrancy safeguard
-        (bool success,) = to.call{value: amount}("");
-        require(success, "Transfer failed.");
     }
 
     // @dev swap amountIn of tokenIn for tokenOut using UniswapV3 router interface
@@ -67,24 +88,4 @@ contract Swap is Ownable {
         // do actual swap
         amountOut = router.exactInputSingle(params);
     }
-
-    function withdrawETH() external onlyOwner {
-        payable(msg.sender).transfer(address(this).balance);
-    }
-
-    function withdrawERC20(address tokenAddress, uint256 amount) external onlyOwner {
-        IERC20(tokenAddress).transferFrom({from: address(this), to: msg.sender, amount: amount});
-    }
-
-    // @dev get ERC20 token balance of Arbitrage contract
-    function getTokenBalance(address tokenAddress) external view returns (uint256) {
-        uint256 balance = IERC20(tokenAddress).balanceOf(address(this));
-        return balance;
-    }
-
-    function transferERC20(address tokenAddress, address recipient, uint256 amount) external onlyOwner {
-        IERC20(tokenAddress).transferFrom({from: address(this), to: recipient, amount: amount});
-    }
-
-    receive() external payable {}
 }

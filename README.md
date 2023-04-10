@@ -32,38 +32,34 @@ forge test -vvv --fork-url ${RPC_URL}${RPC_API_KEY}
 - `Provider` class to interact with any local or remote chain.
 - `Contract` class to interact with any existing contract on local or remote chain.
 - CLI tool to interact with above classes from the command line
-- tests:
-  - unittests to test Python modules
-  - scripttests to demonstrate the required functionality (i.e. the atomic swap as described in the assignmen)
+- tests to demonstrate the required functionality (i.e. the atomic swap as described in the assignmen)
 
 ## Atomic swap
 
-Here the manual steps are described to demonstrate the functionality of the atomic swap. They are also tested in `tests/unit`. After install dependencies one can run the tests with `make test.py.script`.
-
-1. In a separate window a mainnet fork is running. Account 0 (provided by Hardhat) is used as deployment address.
-2. Deploy the contract using the CLI:  
-```python blockchain/cli.py deploy --contract Swap```
-3. Obtain the address of the contract from the output.
-4. Send funds to contract address:  
-```python blockchain/cli.py transfer --from ${ACCOUNT0} --to <contract-address> --value 10```
+The functionality is tested with both Solidity (Foundry) and Python using the pytest framework, both against the mainnet fork. Assuming a Hardhat mainnet fork is running, test functionality with Foundry as described in the [Smart contract section](#smart-contract). After installing requirements test with Python:
 ```
-5. We then let contract swap ETH for WETH by depositing ETH to the WETH contract address.
-
-
-1. To let the contract peform the Swap we send funds from Account #0 to the address to which the swap contract was deployed.
-2. We swap the ETH from the contract to WETH by transferring x ETH to the address of the WETH ERC20 token.
-3. 
-
-### Ideas and potential next steps
-
-- CLI tool to private registry 
-- Test and upload to registry such that it's available as package:
+pytest tests
 ```
-chain transfer x
-```
-- In production I would assume contract deployment is done by means of a multi-sig process.
 
+This will perform the following tests in a subsequent and dependent order.
+1. Compile and deploy `contracts/Swap.sol`.
+2. Transfer ETH from the contract deployer (`ACCOUNT0` provided by Hardhat).
+3. Obtain WETH by transferring ETH from the Swap contract to the WETH contract address.
+4. Swap WETH to USDC on UniSwapV3. For this the UniSwapV3 Router interface is implemented in the contract.
+5. Swap USDC to USDT on SushiSwap, using the UniSwapV2 Router.
+6. Send USDT to an EOA.
 
-## Notes
-https://ethereum.stackexchange.com/questions/19341/address-send-vs-address-transfer-best-practice-usage/38642#38642
+### Ideas and potential next steps, out of scope for this assessment
+
+- Contract:
+  - Add modifiers for balance checks
+  - Add safety checks
+  - Currently contract does swap (as per the assignment), but even if the swap results in a loss. In case of arbitrage one would want to revert the transaction if it is not at profit. This check  needs to be added.
+- Module:
+  - Containerization / portability: build, test, and deploy the contract from a container to avoid "yes, but it worked on my machine".
+  - Basic CLI tool can be extended and uploaded to private registry for convenient usage across devs in C11.
+  - Add pipeline for testing, linting and deployment
+  - Add unit tests for the Python module itself.
+- Deployment: 
+  - Currently the contract deploys from a simple machine, whereas in production I would assume contract deployment is done by means of a multi-sig process.
 

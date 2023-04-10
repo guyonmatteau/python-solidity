@@ -56,7 +56,7 @@ def test_deposit_eth_to_weth(erc20):
     weth_address = CONFIG["tokens"]["weth"]
 
     # let the swap contract deposit ETH to WETH
-    contract.functions.transferETH(
+    contract.functions.transfer(
         contract.w3.to_checksum_address(weth_address), value
     ).transact()
 

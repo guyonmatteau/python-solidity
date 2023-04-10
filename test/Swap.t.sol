@@ -38,20 +38,21 @@ contract SwapTest is Test {
 
         // swap ETH to WETH by transfering ETH
         vm.prank(contractDeployer);
-        swap.transferETH({to: weth, amount: 1 ether});
+        swap.transfer({to: weth, amount: 1 ether});
         uint256 wethBalance = IERC20(weth).balanceOf(address(swap));
 
         // assert that ETH was transferred
         assertFalse(wethBalance == 0);
         assertFalse(address(swap).balance == 10 ether);
-        console.log("Swap contract WETH balance post transfer: %s", wethBalance);
+        console.log("Contract WETH balance post transfer: %s", wethBalance);
     }
 
     function testSwapUniV3() public {
         // swap ETH to WETH by transfering ETH
         vm.prank(contractDeployer);
-        swap.transferETH({to: weth, amount: 10 ether});
+        swap.transfer({to: weth, amount: 10 ether});
         uint256 wethBalance = IERC20(weth).balanceOf(address(swap));
+        console.log("Contract WETH balance pre Uniswap", wethBalance);
 
         // USDC balance of Swap contract should be 0 pre-swap
         uint256 usdcBalance = IERC20(usdc).balanceOf(address(swap));
@@ -66,7 +67,7 @@ contract SwapTest is Test {
         uint256 newUSDCBalance = IERC20(usdc).balanceOf(address(swap));
         assertFalse(newUSDCBalance == 0, "USDC balance still zero post-swap");
 
-        console.log("USDC balance post swap: %s", tokensOut);
+        console.log("Contract USDC balance post UniSwap: %s", tokensOut);
     }
 
     // swap USDC for USDT
@@ -75,7 +76,7 @@ contract SwapTest is Test {
         testSwapUniV3();
 
         uint256 usdcBalance = IERC20(usdc).balanceOf(address(swap));
-        console.log("USDC balance pre Sushi swap", usdcBalance);
+        console.log("Contract USDC balance pre SushiSwap", usdcBalance);
 
         // check initial condition that USDT balance is zero pre swap
         uint256 usdtBalance = IERC20(usdt).balanceOf(address(swap));
@@ -84,13 +85,32 @@ contract SwapTest is Test {
         // swap usdc for usdt. USDC denotes its value in 6 decimals, so if we pick 1 gwei = 1e9 wei = 1000$
         vm.prank(contractDeployer);
         uint256 tokensOut = swap.swapUniV2({_router: sushiswap, tokenIn: usdc, tokenOut: usdt, amount: usdcBalance});
-
-        console.log("Tokens out: %s", tokensOut);
+        console.log("SushiSwap tokensOut: %s", tokensOut);
 
         // check initial condition that USDT balance is zero pre swap
         uint256 newUSDTBalance = IERC20(usdt).balanceOf(address(swap));
         assertFalse(newUSDTBalance == 0, "USDT balance still zero post-swap");
+        console.log("Contract USDT balance post SushiSwap: %s", tokensOut);
+    }
 
-        console.log("USDT balance post swap: %s", tokensOut);
+    function testTransferERC20() public {
+        // make sure contract has UDST to transfer
+        testSwapUniV2();
+
+        uint256 contractUSDTBalance = IERC20(usdt).balanceOf(address(swap));
+        assertFalse(contractUSDTBalance == 0);
+        console.log("Contract USDT balance post SushiSwap", contractUSDTBalance);
+
+        address recipient = makeAddr("recipient");
+        assertEq(IERC20(usdt).balanceOf(recipient), 0, "ERC20 balance of recipient not zero pre transfer");
+        // transfer USDT from contract to recipient
+        vm.prank(contractDeployer);
+        swap.transferERC20({token: usdt, recipient: recipient, amount: contractUSDTBalance});
+
+        // check balance of recipient
+        uint256 usdtBalancePostTransfer = IERC20(usdt).balanceOf(recipient);
+        assertEq(usdtBalancePostTransfer, contractUSDTBalance, "Not all tokens were transferred");
+        assertEq(IERC20(usdt).balanceOf(address(swap)), 0, "Not all USDT transferred");
+        console.log("Recipient USDT balance post transfer", usdtBalancePostTransfer);
     }
 }
