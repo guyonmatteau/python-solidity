@@ -63,8 +63,7 @@ Taking the opcodes workflow as described above, and constructing them separately
 PUSH1 0x00
 CALLDATALOAD
 ```
-First push 0 as calldataload offset to the top of the stack, then load calldata to the top of the stack 
-Loading calldata of size 32 bytes to the top of the stack. First push 0 as offset for the calldataload to the stack, then load calldata. 
+First push 0 as calldataload offset to the top of the stack, then load calldata to the top of the stack.
 
 ### Return block
 Return block to return a value that is on top of the stack at the beginning of this block.
