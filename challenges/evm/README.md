@@ -8,13 +8,15 @@ What is the shortest runtime bytecode you can write for a contract that satisfie
 - Accept calldata of length 32 bytes representing one uint256 (no function selector);
 - Returns, as one uint256, the Fibonacci number at the index of the input (the sequence can start at either 0 or 1).
 
-The problem states: the Fibonacci number at the index of the input. In other words, given input `n` , return the value at index `n` of the Fibonacci sequence. The Fibonacci sequence 
-is a sequence in which each number is the sum of the two preceding ones. Starting from 0 and 1, the first values of the sequence are:  
-`0, 1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144`.
-
-For example, if our input value equals `n = 6`, the function needs to return 8, which is the value that resides at index 6.
-
 ## Approach
+The problem states: the Fibonacci number at the index of the input. In other words, given input `n` , return the value at index `n` of the Fibonacci sequence. The Fibonacci sequence 
+is a sequence in which each number is the sum of the two preceding ones:
+
+| n    | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7  | 8  | 8  | 9  | 10 | 11  | 12  | 13  | 14  | 15  | 16   | ... | 100                         |
+|------|---|---|---|---|---|---|---|----|----|----|----|----|-----|-----|-----|-----|-----|------|-----|-----------------------------|
+| F(n) | 0 | 1 | 1 | 2 | 3 | 5 | 8 | 13 | 21 | 34 | 55 | 89 | 144 | 233 | 377 | 610 | 987 | 1597 | ... | 354,224,848,179,261,915,075 |
+
+
 _No function selector_ implies that we need to use the fallback function of the contract, which will save us 4 bytes in runtime bytecode. The fallback function does not take any parameters, so as the problem statement states, the `uint265` input number `n` is passed as 32 bytes length calldata. In the case of no function selector and `n = 20`, calldata would thus be
 `0x00000000000000000000000000000000000000000000000000000000000014`, which is 20 in hexadecimal format padded to 32 bytes. 
 
@@ -22,122 +24,149 @@ Given that **there exist valid solutions of length less than 50 bytes**, Solidit
 ```
 solc --bin-runtime Empty.sol
 ```
-already shows a byte length of few hundreds bytes. On [Github](https://github.com/drujensen/fib) (and related discussion on [Hackernews](https://news.ycombinator.com/item?id=18091655)) an interesting benchmark was done between all major programming languages to compute the Fibonacci number, but mainly in a recursvie manner. Mentioned language are all non-EVM based and thus do not have to deal with gas, only the time- and space-complexity matters. Now recursion has a time complexity of $O(x^n)$, which means that the transaction possibly
-consume an infinite amount of gas. A more suffisticated approach is memoization, which only requires one for-loop, thereby reducing the time complexity to $O(n)$, a significant improvement. An example can be found in `Memoization.sol` (not using the fallback functiOn), but this contract too will compile to hundreds of bytes. It does help though, in providing insights in the way to move forward. In pseudocode the memoic approach of returning the `n`-th index of the Fibonacci sequence would boild down to something in the lines of
+already shows a byte length of few hundreds bytes. On [Github](https://github.com/drujensen/fib) (and related discussion on [Hackernews](https://news.ycombinator.com/item?id=18091655)) an interesting benchmark was done between all major programming languages to compute the Fibonacci number, but mainly in a recursive manner. Mentioned language are all non-EVM based and thus do not have to deal with gas, only the time- and space-complexity matters. Now recursion has a time complexity of $O(x^n)$, which means that the transaction possibly
+consume an infinite amount of gas. A more suffisticated approach is memoization, which only requires one for-loop, thereby reducing the time complexity to $O(n)$, a significant improvement. An example can be found in `Memoization.sol` (not using the fallback function), but this contract too will compile to hundreds of bytes. It does help though, in providing insights in the way to move forward. In pseudocode the memoic approach of returning the $n$-th index of the Fibonacci sequence would boild down to something in the lines of
 ```
 contract Fibonacci {
 
-    fallback() payable external returns (bytes memory b) {
-
-        if n is 0 or 1:
-            b = n
-        else:
-            initalize a = 0 and b = 1
-            for i = 2, i <= n, i++:
-                c = a + b
-                a = b
-                b = c
-       return b
+    fallback() payable external returns (bytes memory k) {
+        initialize j = 0
+        initialize k = 0
+        for {i = 2, i <= n, i++}:
+            m = k + j
+            j = k
+            k = m
+       return k
     }
 ```
 
-This provides us insights in how we can construct the required components for the workflow.
+This provides us insights in how we can construct the required components for the workflow. In order to get to the opcode workflow, first a opcode schema was developed for a simple for-loop with a summed variable (see Appendix A1). From there onwards the Fibonacci logic was added by adding an extra variable and thinking through the loop body.
 
-**Opcode workflow:**
-1. Load calldata `n` to the stack
-2. If `n` is 0 or 1, jump to return anchor (8)
-3. Prepare for-loop by initializing variables
-4. Anchor point for start of loop
-5. Condition if we should do the loop body
-6. Loop body (including incrementing `i`)
-7. Jump to start-of-loop anchor (4)
-8. Return block
+## Opcode workflow
+1. Load calldata $n$ to the stack
+2. Initialize variables. 
+3. Loop condition: determine if we need to execute the loop body. If $n \in [0, 1]$ jump to return anchor. This is handled by instantiating $i = 2$.
+4. Loop body
+   1. Increment counter `i`
+   2. Execute body: Fibonacci logic
+5. Jump back to loop condition
+6. Return block
 
 
 ## Opcode blocks
 
-Taking the opcodes workflow as described above, and constructing them separately. Note `stack[1]` is the top item of the stack.
+Now the separate opcode blocks can be constructed (independently of their context) as referred to above. Note `stack[1]` is the top item of the stack. Each time it is commented with `stack: [x]` means the stack **after** applying the operation. The separate blocks exclude jump destinations. They are added at the end to the loop condition and the return block. `[0/1]` indicates the result of an evaluation, i.e. `0` or `1`.
 
-### Load calldata to the top of stack
+### 1. Load calldata to the top of stack
 ```
-PUSH1 0x00
-CALLDATALOAD
+PUSH1 0x00      // stack after operation: [0]
+CALLDATALOAD    // stack after operation: [n]
 ```
-First push 0 as calldataload offset to the top of the stack, then load calldata to the top of the stack.
 
-### Return block
+### 2. Initalize variables for loop
+```
+PUSH1 0x01      // Instanstiate k = 1: [k]
+PUSH1 0x00      // Instanstiate j = 0: [j][k]
+```
+
+### 3. Loop condition 
+Condition to check if the the loop body needs to be executed, i.e. basically evaluationg whether `i <= n`, or `i > n`. For this the loop variables are duplicated.
+Starting with stack `[i][n]` (loop variables), duplicate and check condition:
+```
+DUP2        // stack:           [n][i][n]
+DUP2        // stack:           [i][n][i][n]   
+GT          // evaluate i <= n: [0/1][i][n]
+PUSH1 0xYY  // add jump destination of return block, if block does not need to be executed: [returnblock][0/1][i][n]
+JUMPI
+```
+
+### 4. Loop body: increment counter
+Incrementing counter `i` is as simple as
+```
+PUSH1 0x01      // stack: [1]i]
+ADD             // stack: [i+1]
+```
+
+### 5. Loop body: Fibonacci logic
+For Fibonacci, it is relevant that  
+$
+l = k + j \\
+k = j \\
+j = l  \\
+$ 
+can also be written as   
+$
+k^* = k + j \\ 
+k = j  \\
+j = k^* = k + j  \\
+$
+and thus that we only need to update two variables, not three:
+```
+DUP1    // duplicate k:     [k][k][j]
+SWAP2   // swap k and j:    [j][k][k]
+ADD     // add j and k:     [k*][k]
+```
+
+### 6. Jump to loop condition
+```
+PUSH1 0xYY  // jump destination of loop condition, to be determined during compilation
+JUMP
+```
+
+### 7. Return block
 Return block to return a value that is on top of the stack at the beginning of this block.
 ```
-JUMPDEST    // return block anchor
-PUSH1 0x00
+JUMPDEST        // return block anchor
+PUSH1 0x00      // MSTORE offset: [0][k*][k]
 MSTORE
 PUSH1 0x20
 PUSH1 0x00
 RETURN
 ```
-Push 0 to the stack, then store value `stack[2]` in memory with offset 0. This means the first 32 bytes of the memory equal the value that needs to be returned. Finally we push 0x20 (32 decimal) to the stack, then offset 0, such that the first 32 bytes from memory with offset 0 are returned.
+Push 0 to the stack, then store value `stack[2]` in memory with offset 0. This means the first 32 bytes of the memory equal the value that needs to be returned. Finally we push 0x20 (32 decimal) to the stack, then offset 0, such that the first 32 bytes are returned, which is $k^*$.
 
-### Condition to check calldata equals 0 or 1
-```
-PUSH1 	0x02  // after this stack = [2][n]
-SGT
-PUSH1 	0x0c  // jumpdestination in byte offset of JUMPDEST at the top of final return block
-JUMPI
-```
-At the start of this block we have the input data on top (`stack[1]`) of the stack. Then we want to check if the input data is 0 or 1, i.e. smaller than 2. So we push 2 on top of the stack, then check if 2 is greater than the input. If this is the case, we end up with 0 on top of the stack. Next we add the byte offset of the jump destination (depending on total bytesize) of the final return block to the top of the stack, and JUMPI will alter the program counter, on the condition that the calldata is smaller than 2.
+## Version 1
+Combining the above blocks, adding a `JUMPDEST` for the loop condition and the return block, and adding a few swaps and pops we arrive at the first version of our Fibonacci code.
 
-### Prepare / initialize for-loop
-```
-PUSH1  0x00     // a
-PUSH1  0x01     // b
-PUSH1  0x02     // i, starting index of for-loop. Stack is now [2][1][0][n]
-DUP4            // duplicate n to the top of the stack in order to enter the loop condition
-```
+| Opcode block                       | **Name**     | **Value** | **Function**                                 | **Stack after operation**      |
+|------------------------------------|--------------|-----------|----------------------------------------------|--------------------------------|
+| **Load calldata**            | PUSH1        | 0x00      | Offset to load calldata                      | [0]                            |
+|                                    | CALLDATALOAD |           |                                              | [n]                            |
+| **Prepare / initalize for loop**   | PUSH1        | 0x01      | Instantiate k = 1                            | [k][n]                         |
+|                                    | PUSH1        | 0x00      | Instantiate j = 0                            | [j][k][n]                      |
+|                                    | SWAP2        |           |                                              | [n][k][j]                      |
+|                                    | PUSH1        | 0x02      | Instantiate i = 2                            | [i][n][k][j]                   |
+| **Loop condition [loopcondition]** | JUMPDEST     |           | Check if we need to run the loop body        |                                |
+|                                    | DUP2         |           | Duplicate n                                  | [n][i][n][k][j]                |
+|                                    | DUP2         |           | Duplicate i                                  | [i][n][i][n][k][j]             |
+|                                    | GT           |           | Check if i > n, if true jump to return block | [0/1][i][n][k][j]              |
+|                                    | PUSH1        | 0x1c      | Add jump destination of return block         | [returnblock][0/1][i][n][k][j] |
+|                                    | JUMPI        |           |                                              |                                |
+| **Loop body: increment counter**   | PUSH1        | 0x01      | Add increment for i                          | [1][i][n][k][j]                |
+|                                    | ADD          |           | Increment i                                  | [i+1][n][k][j]                 |
+| **Loop body: Fibonacci**           | SWAP2        |           | Swap k with i                                | [k][n][i+1][j]                 |
+|                                    | DUP1         |           | Duplicate k                                  | [k][k][n][i+1][j]              |
+|                                    | SWAP4        |           | Swap k with j                                | [j][k][n][i+1][k]              |
+|                                    | ADD          |           | Add k + j = k*                               | [k*][n][i+1][k]                |
+|                                    | SWAP2        |           | Swap k* with i                               | [i+1][n][k*][k]                |
+| **Jump back to loop condition**    | PUSH1        | 0x0a      | Add jump destination of loop condition       | [loopcondition][i+1][n][k*][k] |
+|                                    | JUMP         |           |                                              |                                |
+| **Return block [returnblock]**     | JUMPDEST     |           | Jump destination for return block            |                                |
+|                                    | POP          |           | Pop i off the stack                          | [n][k*][k]                     |
+|                                    | POP          |           | Pop n off the stack                          | [k*][k]                        |
+|                                    | PUSH1        | 0x00      | MSTORE offset                                | [0][k*][k]                     |
+|                                    | MSTORE       |           | Store to be returned value in memory         |                                |
+|                                    | PUSH1        | 0x20      | Return size 32 bytes                         | [20]                           |
+|                                    | PUSH1        | 0x00      | Return offset                                | [0][20]                        |
+|                                    | RETURN       |           | Return k* to caller                          |                                |
 
-### Loop condition
-Anchor for start of the for-loop including condition to check whether the loop body needs to be executed
-```
-JUMPDEST  // for-loop anchor. At this point the top two items of the stack are i and n.
-EQ
-PUSH1   0x0c     // jumpdestination in byte offset containing the anchor for the loop body
-JUMPI
-```
+This is a solution valid for the Fibonacci sequence where $n \in [1, 12]$: since we initalize $k = 1$ we get $F(0) = 1$ which is not correct, and since $k, j$ are instantiated as 1 byte values it can only return correctly until $F(12) = 233$; the max value it can return is $16^2 = 256$. The bytecode representation of this solution is `600035600160009160025b818111601c576001019180930191600a565b505060005260206000f3`, which is **39 bytes** long.
 
-### Loop body: add last two Fibonacci numbers
-_work in progress_
+## Version 2
+Now the Fibonacci sequence until `n = 12` is a start. Let's make that bigger.
 
-## Runtime bytecode
 
-Overview of overall runtime bytecode in Opcode representation
 
-|    | **Opcode block**               | **Opcode**   | **Value** | **Function**                                                         | Notes                            |   |
-|----|--------------------------------|--------------|-----------|----------------------------------------------------------------------|----------------------------------|---|
-| 1  | Load calldata                  | PUSH1        | 0x00      | Offset for calldataload                                              |                                  |   |
-| 2  |                                | CALLDATALOAD |           | Load calldata to stack with offset 0                                 |                                  |   |
-| 3  | Case n equals 0 or 1           | PUSH1        | 0x02      | Value to check if input smaller than 2                               |                                  |   |
-| 4  |                                | SGT          |           | Sign-greater-than                                                    |                                  |   |
-| 5  |                                | PUSH1        | 0x08      | Byte offset of return block anchor                                   | Byte offset value not checked    |   |
-| 6  |                                | JUMPI        |           | Conditionally jump to return block                                   |                                  |   |
-| 7  | _Prepare / initalize for loop_ | PUSH1        | 0x00      | Add `a` to stack                                                     |                                  |   |
-| 8  |                                | PUSH1        | 0x01      | Add `b` to stack                                                     |                                  |   |
-| 9  |                                | PUSH1        | 0x02      | Add `i`, the starting index for the for-loop                         |                                  |   |
-| 10 |                                | DUP4         |           | Duplicate the call data from `stack[4]` to the top of the stack      |                                  |   |
-| 11 | Loop condition                 | JUMPDEST     |           | Anchor loop condition                                                |                                  |   |
-| 12 |                                | EQ           |           | Condition to check if we should execute loop body                    |                                  |   |
-| 13 |                                | PUSH1        | 0x        | Jumpdestination byte offset that equals anchor of loop body (15)     | Byte offset value not checked    |   |
-| 14 |                                | JUMPI        |           | Conditionally jump to loop body anchor                               |                                  |   |
-| 15 | Loop body                      | JUMPDEST     |           | Anchor for loop body                                                 |                                  |   |
-| 16 |                                | ADD          |           | Add a and b (see pseudocode)                                         |                                  |   |
-| 17 |                                | SWAPX        |           | Swap a with b such that a = b (see pseudocode)                       | Stack index not checked for swap |   |
-| 18 |                                | SWAPX        |           | Swap b with c such that b = c (see pseudocode)                       | Stack index not checked for swap |   |
-| 19 |                                | DUPX         |           | Get n to top of stack                                                | Stack index not checked          |   |
-| 20 |                                | PUSH1        | 0x01      | Value to increment i                                                 |                                  |   |
-| 21 |                                | ADD          |           | Increment i                                                          |                                  |   |
-| 22 |                                | PUSH1        | 0x        | Add byte offset for loop condition to stack (i.e. byte offest of 11) | Byte offset value not checked    |   |
-| 23 |                                | JUMP         |           | Jump to loop condition (11)                                          |                                  |   |
-| 24 | Return block                   | JUMPDEST     |           | Anchor for return block                                              |                                  |   |
-| 25 |                                | PUSH1        | 0x00      | MSTORE offset                                                        |                                  |   |
-| 26 |                                | MSTORE       |           | Store the to be returned value (currently on `stack[1]`) in memory   |                                  |   |
-| 27 |                                | PUSH01       | 0x20      | Size of return value (32 bytes)                                      |                                  |   |
-| 28 |                                | PUSH1        | 0x00      | Memory offset of return value                                        |                                  |   |
-| 29 |                                | RETURN       |           |                                                                      |                                  |   |
+## Additional possible solutions
+
+
