@@ -1,17 +1,17 @@
-# EVM Challenge
+---
+title: Fibonacci
+margin-left: 2cm
+author: Anne Lohmeijer
+---
 
-This doc contains the approach for solving the EVM challenge.
+## Summary
 
-# Content
-
-## Introduction
-
-A runtime bytecode of length **39 bytes** is presented to return the Fibonacci number at the index of the input, $F(n)$, starting at sequence 1. The solution is obtained by constructing it step by step from opcode blocks. The solution has been tested for $n \in [1, 100]$, providing valid solutions with approximate gas usage of $~21K$ gas per call. The bytecode representation of the solution is
+A runtime bytecode of length **39 bytes** is presented to return the Fibonacci number at the index of the input, $F(n)$, starting at sequence 1. The solution is obtained by constructing it step by step from opcode blocks. The solution has been tested for $n \in [1, 100]$, providing valid solutions with approximate gas usage of $~21K$ gas per call. The bytecode representation of the solution is  
 ```
 600035600160009160025b818111601c576001019180930191600a565b505060005260206000f3
 ```
 
-## Initial conditions
+## Introduction
 
 The aim is to develop the shortest runtime bytecode that can be written for a contract that accepts calldata of length 32 bytes, representing one uint256 (no function selector), returning as one uint256 the Fibonacci number at the index of the input. The sequence can start at either 0 or 1.
 
@@ -25,7 +25,7 @@ The Fibonacci sequence is defined as a sequence in which each number is the sum 
 | F(n) | 0 | 1 | 1 | 2 | 3 | 5 | 8 | 13 | 21 | 34 | 55 | 89 | 144 | 233 | 377 | 610 | 987 | 1597 | ... | 354,224,848,179,261,915,075 |
 
 
-_No function selector_ implies that we need to use the fallback function of the contract, which will save us 4 bytes in runtime bytecode. The fallback function does not take any parameters, so without function selector, taking example $n = 20$, the calldata would be
+_No function selector_ implies that we need to use the fallback function of the contract, which will save us 4 bytes in runtime bytecode. The fallback function does not take any parameters, so without function selector, taking example $n = 20$, the calldata would be  
 `0x00000000000000000000000000000000000000000000000000000000000014`, which is 20 in hexadecimal format padded to 32 bytes. 
 
 Given that **there exist valid solutions of length less than 50 bytes**, developing a contract in Solidity or even Yul and compile that will result in a bytecode length of several hundreds of bytes. Compiling a simple empty contract, e.g. 
@@ -101,15 +101,19 @@ ADD             // stack: [i+1]
 ### 5. Loop body: Fibonacci logic
 For Fibonacci, it is relevant that  
 $
+\begin{aligned}
 l = k + j \\
 k = j \\
 j = l  \\
+\end{aligned}
 $ 
 can also be written as   
 $
+\begin{aligned}
 k^* = k + j \\ 
 k = j  \\
 j = k^* = k + j  \\
+\end{aligned}
 $
 and thus that we only need to update two variables, not three:
 ```
@@ -171,12 +175,14 @@ Combining the above blocks, adding a `JUMPDEST` for the loop condition and the r
 |                                    | PUSH1        | 0x00      | Return offset                                | [0][20]                        |
 |                                    | RETURN       |           | Return k* to caller                          |                                |
 
-This is a solution valid for the Fibonacci sequence where $n > 0$: since we initalize $k = 1$ we get $F(0) = 1$ which is not correct. The bytecode representation of this solution is `600035600160009160025b818111601c576001019180930191600a565b505060005260206000f3`, which is **39 bytes** long.
+This is a solution valid for the Fibonacci sequence where $n > 0$: since we initalize $k = 1$ we get $F(0) = 1$ which is not correct. The bytecode representation of this solution is  
+```
+600035600160009160025b818111601c576001019180930191600a565b505060005260206000f3
+```  
+which is **39 bytes** long.
 
 ## Potential improvements
 
 The Fibonacci problem is quite an interesting computer science problem, both in scripted and more machine code languages. On [codegolf.exchange](https://codegolf.stackexchange.com/questions/247835/previous-fibonacci-number), interesting solutions are mentioned for many languages. If we reflect on the provided solution of this document, one can identify a few potential improvements. First changing the algorithm by investigating a while loop. A for loop is essentially a while loop and one would need to keep track of one variable less. Computing the start variable would require extra opcodes though. 
 
-From a gas point of view, there are additional aspects to consider when optimizing. Currently the solution has $n - i$ unconditional jumps, and one conditional jump. Now when refactoring to a while loop there are two ways of implementing this, which would result in $n$ conditional **and** $n$ unconditional loops, resulting in more opcodes to be executed and thus more gas consumed. This also relates to the time and space complexity of the chosen algorithm, but is out of scope for this work.
-
-
+From a gas point of view, there are additional aspects to consider when optimizing. Currently the solution has $n - i$ unconditional jumps, and one conditional jump. Now when refactoring to a while loop there are multiple ways of implementing this, which would possibly result in $n$ conditional **and** $n$ unconditional loops, resulting in more opcodes to be executed and thus more gas consumed. 

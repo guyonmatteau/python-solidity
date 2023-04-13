@@ -44,3 +44,5 @@ MANIFEST
 # jupyter notebook stuff
 Untitled.ipynb
 .ipynb_checkpoints*
+
+challenges/evm/Fibonacci.pdf
