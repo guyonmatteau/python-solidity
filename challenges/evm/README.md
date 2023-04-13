@@ -20,10 +20,9 @@ The aim is to develop the shortest runtime bytecode that can be written for a co
 
 The Fibonacci sequence is defined as a sequence in which each number is the sum of the two preceding ones:
 
-| n    | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7  | 8  | 8  | 9  | 10 | 11  | 12  | 13  | 14  | 15  | 16   | ... | 100                         |
-|------|---|---|---|---|---|---|---|----|----|----|----|----|-----|-----|-----|-----|-----|------|-----|-----------------------------|
-| F(n) | 0 | 1 | 1 | 2 | 3 | 5 | 8 | 13 | 21 | 34 | 55 | 89 | 144 | 233 | 377 | 610 | 987 | 1597 | ... | 354,224,848,179,261,915,075 |
-
+| **n**    	| 0 	| 1 	| 2 	| 3 	| 4 	| 5 	| 6 	| 7  	| 8  	| 8  	| 9  	| 10 	| ... 	| 100                         	| ... 	|
+|----------	|---	|---	|---	|---	|---	|---	|---	|----	|----	|----	|----	|----	|-----	|-----------------------------	|-----	|
+| **F(n)** 	| 0 	| 1 	| 1 	| 2 	| 3 	| 5 	| 8 	| 13 	| 21 	| 34 	| 55 	| 89 	| ... 	| 354,224,848,179,261,915,075 	| ... 	|
 
 _No function selector_ implies that we need to use the fallback function of the contract, which will save us 4 bytes in runtime bytecode. The fallback function does not take any parameters, so without function selector, taking example $n = 20$, the calldata would be  
 `0x00000000000000000000000000000000000000000000000000000000000014`, which is 20 in hexadecimal format padded to 32 bytes. 
@@ -51,7 +50,7 @@ contract Fibonacci {
     }
 ```
 
-This provides insights in how the required components for the workflow can be constructed. In order to get to the opcode workflow, first an opcode schema was developed for a simple for-loop with a dummy loop body (see Appendix A1). From there onwards the Fibonacci logic was added by adding an extra variable and thinking through the loop body.
+This provides insights in how the required components for the workflow can be constructed. In order to get to the opcode workflow, first an opcode schema was developed for a simple for-loop with a dummy loop body. From there onwards the Fibonacci logic was added by adding an extra variable and thinking through the loop body.
 
 ## Opcode workflow
 1. Load calldata $n$ to the stack
@@ -87,7 +86,7 @@ Starting with stack `[i][n]` (loop variables), duplicate and check condition:
 DUP2        // stack:           [n][i][n]
 DUP2        // stack:           [i][n][i][n]   
 GT          // evaluate i <= n: [0/1][i][n]
-PUSH1 0xYY  // add jump destination of return block, if block does not need to be executed: [returnblock][0/1][i][n]
+PUSH1 0xYY  // add jump destination of return block. Stack: [returnblock][0/1][i][n]
 JUMPI
 ```
 
@@ -100,21 +99,21 @@ ADD             // stack: [i+1]
 
 ### 5. Loop body: Fibonacci logic
 For Fibonacci, it is relevant that  
-$
+$$
 \begin{aligned}
 l = k + j \\
 k = j \\
 j = l  \\
 \end{aligned}
-$ 
+$$  
 can also be written as   
-$
+$$
 \begin{aligned}
 k^* = k + j \\ 
 k = j  \\
 j = k^* = k + j  \\
 \end{aligned}
-$
+$$
 and thus that we only need to update two variables, not three:
 ```
 DUP1    // duplicate k:     [k][k][j]
@@ -143,7 +142,7 @@ Push 0 to the stack, then store value `stack[2]` in memory with offset 0. This m
 ## Opcode solution
 Combining the above blocks, adding a `JUMPDEST` for the loop condition and the return block, and adding a few swaps and pops we arrive at the first version of our Fibonacci code.
 
-| Opcode block                       | **Name**     | **Value** | **Function**                                 | **Stack after operation**      |
+| **Opcode block**                   | **Name**     | **Value** | **Function**                                 | **Stack after operation**      |
 |------------------------------------|--------------|-----------|----------------------------------------------|--------------------------------|
 | **Load calldata**                  | PUSH1        | 0x00      | Offset to load calldata                      | [0]                            |
 |                                    | CALLDATALOAD |           |                                              | [n]                            |
@@ -175,6 +174,8 @@ Combining the above blocks, adding a `JUMPDEST` for the loop condition and the r
 |                                    | PUSH1        | 0x00      | Return offset                                | [0][20]                        |
 |                                    | RETURN       |           | Return k* to caller                          |                                |
 
+
+
 This is a solution valid for the Fibonacci sequence where $n > 0$: since we initalize $k = 1$ we get $F(0) = 1$ which is not correct. The bytecode representation of this solution is  
 ```
 600035600160009160025b818111601c576001019180930191600a565b505060005260206000f3
@@ -183,6 +184,8 @@ which is **39 bytes** long.
 
 ## Potential improvements
 
-The Fibonacci problem is quite an interesting computer science problem, both in scripted and more machine code languages. On [codegolf.exchange](https://codegolf.stackexchange.com/questions/247835/previous-fibonacci-number), interesting solutions are mentioned for many languages. If we reflect on the provided solution of this document, one can identify a few potential improvements. First changing the algorithm by investigating a while loop. A for loop is essentially a while loop and one would need to keep track of one variable less. Computing the start variable would require extra opcodes though. 
+The Fibonacci problem is quite an interesting computer science problem, both in scripted and more machine code languages. On [codegolf.exchange](https://codegolf.stackexchange.com/questions/247835/previous-fibonacci-number), interesting solutions are mentioned for many languages, of lengths half the length of the provided solution here. 
+
+If we reflect on the provided solution of this document, one can identify a few potential improvements. First changing the algorithm by investigating a while loop. A for loop is essentially a while loop and one would need to keep track of one variable less. Computing the start variable would require extra opcodes though. 
 
 From a gas point of view, there are additional aspects to consider when optimizing. Currently the solution has $n - i$ unconditional jumps, and one conditional jump. Now when refactoring to a while loop there are multiple ways of implementing this, which would possibly result in $n$ conditional **and** $n$ unconditional loops, resulting in more opcodes to be executed and thus more gas consumed. 
