@@ -2,36 +2,47 @@
 
 This doc contains the approach for solving the EVM challenge.
 
-## Problem statement 
+# Content
 
-What is the shortest runtime bytecode you can write for a contract that satisfies:
-- Accept calldata of length 32 bytes representing one uint256 (no function selector);
-- Returns, as one uint256, the Fibonacci number at the index of the input (the sequence can start at either 0 or 1).
+## Introduction
+
+A runtime bytecode of length **39 bytes** is presented to return the Fibonacci number at the index of the input, $F(n)$, starting at sequence 1. The solution is obtained by constructing it step by step from opcode blocks. The solution has been tested for $n \in [1, 100]$, providing valid solutions with approximate gas usage of $~21K$ gas per call. The bytecode representation of the solution is
+```
+600035600160009160025b818111601c576001019180930191600a565b505060005260206000f3
+```
+
+## Initial conditions
+
+The aim is to develop the shortest runtime bytecode that can be written for a contract that accepts calldata of length 32 bytes, representing one uint256 (no function selector), returning as one uint256 the Fibonacci number at the index of the input. The sequence can start at either 0 or 1.
+
 
 ## Approach
-The problem states: the Fibonacci number at the index of the input. In other words, given input `n` , return the value at index `n` of the Fibonacci sequence. The Fibonacci sequence 
-is a sequence in which each number is the sum of the two preceding ones:
+
+The Fibonacci sequence is defined as a sequence in which each number is the sum of the two preceding ones:
 
 | n    | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7  | 8  | 8  | 9  | 10 | 11  | 12  | 13  | 14  | 15  | 16   | ... | 100                         |
 |------|---|---|---|---|---|---|---|----|----|----|----|----|-----|-----|-----|-----|-----|------|-----|-----------------------------|
 | F(n) | 0 | 1 | 1 | 2 | 3 | 5 | 8 | 13 | 21 | 34 | 55 | 89 | 144 | 233 | 377 | 610 | 987 | 1597 | ... | 354,224,848,179,261,915,075 |
 
 
-_No function selector_ implies that we need to use the fallback function of the contract, which will save us 4 bytes in runtime bytecode. The fallback function does not take any parameters, so as the problem statement states, the `uint265` input number `n` is passed as 32 bytes length calldata. In the case of no function selector and `n = 20`, calldata would thus be
+_No function selector_ implies that we need to use the fallback function of the contract, which will save us 4 bytes in runtime bytecode. The fallback function does not take any parameters, so without function selector, taking example $n = 20$, the calldata would be
 `0x00000000000000000000000000000000000000000000000000000000000014`, which is 20 in hexadecimal format padded to 32 bytes. 
 
-Given that **there exist valid solutions of length less than 50 bytes**, Solidity is obviously not the way to go. Compiling a simple empty contract, e.g. 
+Given that **there exist valid solutions of length less than 50 bytes**, developing a contract in Solidity or even Yul and compile that will result in a bytecode length of several hundreds of bytes. Compiling a simple empty contract, e.g. 
 ```
 solc --bin-runtime Empty.sol
 ```
-already shows a byte length of few hundreds bytes. On [Github](https://github.com/drujensen/fib) (and related discussion on [Hackernews](https://news.ycombinator.com/item?id=18091655)) an interesting benchmark was done between all major programming languages to compute the Fibonacci number, but mainly in a recursive manner. Mentioned language are all non-EVM based and thus do not have to deal with gas, only the time- and space-complexity matters. Now recursion has a time complexity of $O(x^n)$, which means that the transaction possibly
+already shows a byte length of few hundreds bytes. 
+
+### Algorithm
+On [Github](https://github.com/drujensen/fib) (and related discussion on [Hackernews](https://news.ycombinator.com/item?id=18091655)) an interesting benchmark was done between all major programming languages to compute the Fibonacci number, but mainly in a recursive manner. Mentioned language are all non-EVM based and thus do not have to deal with gas, only the time- and space-complexity matters. Now recursion has a time complexity of $O(x^n)$, which means that the transaction possibly
 consume an infinite amount of gas. A more suffisticated approach is memoization, which only requires one for-loop, thereby reducing the time complexity to $O(n)$, a significant improvement. An example can be found in `Memoization.sol` (not using the fallback function), but this contract too will compile to hundreds of bytes. It does help though, in providing insights in the way to move forward. In pseudocode the memoic approach of returning the $n$-th index of the Fibonacci sequence would boild down to something in the lines of
 ```
 contract Fibonacci {
 
     fallback() payable external returns (bytes memory k) {
         initialize j = 0
-        initialize k = 0
+        initialize k = 1
         for {i = 2, i <= n, i++}:
             m = k + j
             j = k
@@ -40,7 +51,7 @@ contract Fibonacci {
     }
 ```
 
-This provides us insights in how we can construct the required components for the workflow. In order to get to the opcode workflow, first a opcode schema was developed for a simple for-loop with a summed variable (see Appendix A1). From there onwards the Fibonacci logic was added by adding an extra variable and thinking through the loop body.
+This provides insights in how the required components for the workflow can be constructed. In order to get to the opcode workflow, first an opcode schema was developed for a simple for-loop with a dummy loop body (see Appendix A1). From there onwards the Fibonacci logic was added by adding an extra variable and thinking through the loop body.
 
 ## Opcode workflow
 1. Load calldata $n$ to the stack
@@ -55,7 +66,7 @@ This provides us insights in how we can construct the required components for th
 
 ## Opcode blocks
 
-Now the separate opcode blocks can be constructed (independently of their context) as referred to above. Note `stack[1]` is the top item of the stack. Each time it is commented with `stack: [x]` means the stack **after** applying the operation. The separate blocks exclude jump destinations. They are added at the end to the loop condition and the return block. `[0/1]` indicates the result of an evaluation, i.e. `0` or `1`.
+Now the separate opcode blocks can be constructed (independently from their context) as referred to above. Note: `stack[1]` is the top item of the stack, and each time the comment contains `stack: [x]`, this means the stack **after** applying the operation. The separate blocks exclude jump destinations. They are added at the end to the loop-condition block and the return block. `[0/1]` indicates the result of an evaluation, i.e. `0` or `1`.
 
 ### 1. Load calldata to the top of stack
 ```
@@ -125,12 +136,12 @@ RETURN
 ```
 Push 0 to the stack, then store value `stack[2]` in memory with offset 0. This means the first 32 bytes of the memory equal the value that needs to be returned. Finally we push 0x20 (32 decimal) to the stack, then offset 0, such that the first 32 bytes are returned, which is $k^*$.
 
-## Version 1
+## Opcode solution
 Combining the above blocks, adding a `JUMPDEST` for the loop condition and the return block, and adding a few swaps and pops we arrive at the first version of our Fibonacci code.
 
 | Opcode block                       | **Name**     | **Value** | **Function**                                 | **Stack after operation**      |
 |------------------------------------|--------------|-----------|----------------------------------------------|--------------------------------|
-| **Load calldata**            | PUSH1        | 0x00      | Offset to load calldata                      | [0]                            |
+| **Load calldata**                  | PUSH1        | 0x00      | Offset to load calldata                      | [0]                            |
 |                                    | CALLDATALOAD |           |                                              | [n]                            |
 | **Prepare / initalize for loop**   | PUSH1        | 0x01      | Instantiate k = 1                            | [k][n]                         |
 |                                    | PUSH1        | 0x00      | Instantiate j = 0                            | [j][k][n]                      |
@@ -160,13 +171,12 @@ Combining the above blocks, adding a `JUMPDEST` for the loop condition and the r
 |                                    | PUSH1        | 0x00      | Return offset                                | [0][20]                        |
 |                                    | RETURN       |           | Return k* to caller                          |                                |
 
-This is a solution valid for the Fibonacci sequence where $n \in [1, 12]$: since we initalize $k = 1$ we get $F(0) = 1$ which is not correct, and since $k, j$ are instantiated as 1 byte values it can only return correctly until $F(12) = 233$; the max value it can return is $16^2 = 256$. The bytecode representation of this solution is `600035600160009160025b818111601c576001019180930191600a565b505060005260206000f3`, which is **39 bytes** long.
+This is a solution valid for the Fibonacci sequence where $n > 0$: since we initalize $k = 1$ we get $F(0) = 1$ which is not correct. The bytecode representation of this solution is `600035600160009160025b818111601c576001019180930191600a565b505060005260206000f3`, which is **39 bytes** long.
 
-## Version 2
-Now the Fibonacci sequence until `n = 12` is a start. Let's make that bigger.
+## Potential improvements
 
+The Fibonacci problem is quite an interesting computer science problem, both in scripted and more machine code languages. On [codegolf.exchange](https://codegolf.stackexchange.com/questions/247835/previous-fibonacci-number), interesting solutions are mentioned for many languages. If we reflect on the provided solution of this document, one can identify a few potential improvements. First changing the algorithm by investigating a while loop. A for loop is essentially a while loop and one would need to keep track of one variable less. Computing the start variable would require extra opcodes though. 
 
-
-## Additional possible solutions
+From a gas point of view, there are additional aspects to consider when optimizing. Currently the solution has $n - i$ unconditional jumps, and one conditional jump. Now when refactoring to a while loop there are two ways of implementing this, which would result in $n$ conditional **and** $n$ unconditional loops, resulting in more opcodes to be executed and thus more gas consumed. This also relates to the time and space complexity of the chosen algorithm, but is out of scope for this work.
 
 
